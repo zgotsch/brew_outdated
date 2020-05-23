@@ -1,0 +1,19 @@
+[package]
+name = "outdated"
+version = "0.1.0"
+authors = ["Zach Gotsch <orbipedis@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[profile.release]
+debug = true
+
+[dependencies]
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+derive_more = "0.99.7"
+tokio = { version = "0.2", features = ["full"] }
+futures = "0.3"
+lazy_static = "1.4.0"
+regex = "1"
