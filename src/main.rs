@@ -14,11 +14,16 @@ mod history;
 mod homebrew;
 
 lazy_static! {
-    static ref EXTRACT_RE: Regex = Regex::new(r#"^\s*(\S+)"#).unwrap();
+    static ref EXTRACT_CMD_RE: Regex = Regex::new(r#"^\s*(\S+)"#).unwrap();
 }
 
 fn extract_cmd(line: &str) -> &str {
-    let first_token: &str = EXTRACT_RE.captures(line).unwrap().get(1).unwrap().as_str();
+    let first_token: &str = EXTRACT_CMD_RE
+        .captures(line)
+        .unwrap()
+        .get(1)
+        .unwrap()
+        .as_str();
     return Path::new(first_token)
         .file_name()
         .unwrap()
@@ -34,15 +39,13 @@ async fn main() -> Result<(), String> {
 
     let outdated_executables = async {
         let outdated = homebrew::outdated().await.unwrap();
-        let executables = join_all(
-            outdated
-                .iter()
-                .map(|p| homebrew::executables(&p.package_name)),
-        )
+        let executables = join_all(outdated.iter().map(|p| {
+            homebrew::executables(&p.package_name, &p.installed_versions.last().unwrap())
+        }))
         .await
         .into_iter()
         .flatten()
-        .collect::<HashSet<String>>();
+        .collect::<HashSet<std::ffi::OsString>>();
         return executables;
     };
 
@@ -50,8 +53,8 @@ async fn main() -> Result<(), String> {
         let history = history::recent_history().await.unwrap();
         history
             .iter()
-            .map(|line| extract_cmd(line).to_owned())
-            .collect::<HashSet<String>>()
+            .map(|line| extract_cmd(line).to_owned().into())
+            .collect::<HashSet<std::ffi::OsString>>()
     };
 
     let (outdated_executables, used_executables) = join!(outdated_executables, used_executables);

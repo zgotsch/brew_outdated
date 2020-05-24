@@ -1,23 +1,26 @@
 use derive_more::{Display, Error};
 use regex::Regex;
 use serde::Deserialize;
+use std::ffi::OsString;
+use std::path::PathBuf;
 use std::str;
 use tokio::process::Command;
+use tokio::stream::StreamExt;
 
 lazy_static! {
-    static ref BREW_PREFIX_RE: Regex = {
-        let brew_prefix = std::process::Command::new("brew")
-            .arg("--prefix")
-            .output()
-            .map_err(|e| e.to_string())
-            .map(|output| {
-                str::from_utf8(&output.stdout)
-                    .map(|s| s.trim().to_owned())
-                    .map_err(|e| e.to_string())
-                    .unwrap()
-            });
-        Regex::new(&format!(r#"{}/bin/(\S+)"#, brew_prefix.unwrap())).unwrap()
-    };
+    static ref BREW_PREFIX: String = std::process::Command::new("brew")
+        .arg("--prefix")
+        .output()
+        .map_err(|e| e.to_string())
+        .map(|output| {
+            str::from_utf8(&output.stdout)
+                .map(|s| s.trim().to_owned())
+                .map_err(|e| e.to_string())
+                .unwrap()
+        })
+        .unwrap();
+    static ref BREW_PREFIX_RE: Regex =
+        Regex::new(&format!(r#"{}/bin/(\S+)"#, &*BREW_PREFIX)).unwrap();
 }
 
 #[derive(Deserialize, Debug)]
@@ -48,17 +51,20 @@ pub async fn outdated() -> Result<Vec<BrewOutdatedEntry>, OutdatedError> {
     return Ok(brew_entries);
 }
 
-pub async fn executables(package_name: &str) -> Vec<String> {
-    let brew_unlink_output = Command::new("brew")
-        .arg("unlink")
-        .arg("--dry-run")
-        .arg(package_name)
-        .output();
-
-    let out: Vec<String> = BREW_PREFIX_RE
-        .captures_iter(str::from_utf8(&brew_unlink_output.await.unwrap().stdout).unwrap())
-        .map(|cap| cap[1].to_owned())
-        .collect();
-
-    return out;
+pub async fn executables(package_name: &str, installed_version: &str) -> Vec<OsString> {
+    let bin_path: PathBuf = [
+        &*BREW_PREFIX,
+        "Cellar",
+        package_name,
+        installed_version,
+        "bin",
+    ]
+    .iter()
+    .collect();
+    tokio::fs::read_dir(&bin_path)
+        .await
+        .unwrap()
+        .map(|r| r.unwrap().file_name())
+        .collect::<Vec<OsString>>()
+        .await
 }
