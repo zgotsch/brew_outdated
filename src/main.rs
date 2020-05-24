@@ -50,10 +50,11 @@ async fn main() -> Result<(), String> {
     };
 
     let used_executables = async {
-        let history = history::recent_history().await.unwrap();
-        history
+        history::recent_history()
+            .await
+            .unwrap()
             .iter()
-            .map(|line| extract_cmd(line).to_owned().into())
+            .map(|line| extract_cmd(line).into())
             .collect::<HashSet<std::ffi::OsString>>()
     };
 
