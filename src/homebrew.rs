@@ -12,13 +12,12 @@ lazy_static! {
         .arg("--prefix")
         .output()
         .map_err(|e| e.to_string())
-        .map(|output| {
+        .and_then(|output| {
             str::from_utf8(&output.stdout)
-                .map(|s| s.trim().to_owned())
                 .map_err(|e| e.to_string())
-                .unwrap()
+                .map(|s| s.trim().to_owned())
         })
-        .unwrap();
+        .expect("Couldn't get brew prefix");
     static ref BREW_PREFIX_RE: Regex =
         Regex::new(&format!(r#"{}/bin/(\S+)"#, &*BREW_PREFIX)).unwrap();
 }

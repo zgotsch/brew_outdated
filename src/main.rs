@@ -74,8 +74,6 @@ async fn main() -> Result<(), String> {
                 },
             )
             .await
-
-        // executables_futures.for_each_concurrent(None, || async {});
     };
 
     let used_executables = async {

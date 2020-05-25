@@ -11,6 +11,11 @@ use tokio::fs;
 
 type HistoryLine = String;
 
+lazy_static! {
+    static ref CMD_RE: Regex = Regex::new("^- cmd: (.*)$").unwrap();
+    static ref TIME_RE: Regex = Regex::new(r#"^\s*when: (\d+)$"#).unwrap();
+}
+
 pub fn bash_history_file_location() -> Option<PathBuf> {
     if let Ok(path) = env::var("HISTFILE") {
         return Some(PathBuf::from(path));
@@ -79,8 +84,6 @@ pub async fn fish_history() -> Option<Vec<FishLine>> {
     let mut fish_lines: Vec<FishLine> = Vec::new();
     let mut current_cmd = None;
     let mut current_time = None;
-    let cmd_re = Regex::new("^- cmd: (.*)$").unwrap();
-    let time_re = Regex::new(r#"^\s*when: (\d+)$"#).unwrap();
     for line in file_contents.lines() {
         if line.starts_with("-") {
             if let (Some(cmd), Some(time)) = (current_cmd.take(), current_time.take()) {
@@ -89,10 +92,10 @@ pub async fn fish_history() -> Option<Vec<FishLine>> {
                 current_time = None;
             }
         }
-        if let Some(caps) = cmd_re.captures(line) {
+        if let Some(caps) = CMD_RE.captures(line) {
             current_cmd = Some(caps[1].to_owned());
         }
-        if let Some(caps) = time_re.captures(line) {
+        if let Some(caps) = TIME_RE.captures(line) {
             current_time = Some(caps[1].parse::<u64>().unwrap());
         }
     }
