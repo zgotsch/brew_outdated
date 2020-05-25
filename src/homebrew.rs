@@ -2,6 +2,7 @@ use derive_more::{Display, Error};
 use regex::Regex;
 use serde::Deserialize;
 use std::ffi::OsString;
+use std::io;
 use std::path::PathBuf;
 use std::str;
 use tokio::process::Command;
@@ -31,6 +32,14 @@ pub struct BrewOutdatedEntry {
     pub pinned: bool,
 }
 
+impl BrewOutdatedEntry {
+    pub fn latest_installed_version(&self) -> &String {
+        return &self.installed_versions.last().expect(
+            "Tried to get the latest installed version of a package with no installed versions.",
+        );
+    }
+}
+
 #[derive(Debug, Display, Error)]
 pub enum OutdatedError {
     UtfParseError(std::str::Utf8Error),
@@ -50,7 +59,7 @@ pub async fn outdated() -> Result<Vec<BrewOutdatedEntry>, OutdatedError> {
     return Ok(brew_entries);
 }
 
-pub async fn executables(package_name: &str, installed_version: &str) -> Vec<OsString> {
+pub async fn executables(package_name: &str, installed_version: &str) -> io::Result<Vec<OsString>> {
     let bin_path: PathBuf = [
         &*BREW_PREFIX,
         "Cellar",
@@ -60,10 +69,9 @@ pub async fn executables(package_name: &str, installed_version: &str) -> Vec<OsS
     ]
     .iter()
     .collect();
-    tokio::fs::read_dir(&bin_path)
-        .await
-        .unwrap()
+    Ok(tokio::fs::read_dir(&bin_path)
+        .await?
         .map(|r| r.unwrap().file_name())
         .collect::<Vec<OsString>>()
-        .await
+        .await)
 }

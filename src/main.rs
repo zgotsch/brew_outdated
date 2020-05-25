@@ -19,18 +19,9 @@ lazy_static! {
     static ref EXTRACT_CMD_RE: Regex = Regex::new(r#"^\s*(\S+)"#).unwrap();
 }
 
-fn extract_cmd(line: &str) -> &str {
-    let first_token: &str = EXTRACT_CMD_RE
-        .captures(line)
-        .unwrap()
-        .get(1)
-        .unwrap()
-        .as_str();
-    return Path::new(first_token)
-        .file_name()
-        .unwrap()
-        .to_str()
-        .unwrap();
+fn extract_cmd(line: &str) -> Option<&str> {
+    let first_token: &str = EXTRACT_CMD_RE.captures(line)?.get(1)?.as_str();
+    Path::new(first_token).file_name()?.to_str()
 }
 
 #[tokio::main]
@@ -53,9 +44,16 @@ async fn main() -> Result<(), String> {
             executables_futures.push(async {
                 let executables = homebrew::executables(
                     &outdated_entry.package_name,
-                    &outdated_entry.installed_versions.last().unwrap(),
+                    &outdated_entry.latest_installed_version(),
                 )
-                .await;
+                .await
+                .unwrap_or_else(|_| {
+                    eprintln!(
+                        r#"Couldn't get executables for package "{}""#,
+                        &outdated_entry.package_name
+                    );
+                    Vec::new()
+                });
                 (outdated_entry, executables)
             });
         }
@@ -79,9 +77,9 @@ async fn main() -> Result<(), String> {
     let used_executables = async {
         history::recent_history()
             .await
-            .unwrap()
+            .expect("Couldn't get shell history")
             .iter()
-            .map(|line| extract_cmd(line).into())
+            .filter_map(|line| extract_cmd(line).map(|s| s.into()))
             .collect::<HashSet<std::ffi::OsString>>()
     };
 
@@ -102,7 +100,7 @@ async fn main() -> Result<(), String> {
             println!(
                 "\t{} (installed: {}, available: {})",
                 Paint::new(executable.to_string_lossy()).bold(),
-                Paint::red(&entry.installed_versions.last().unwrap()).bold(),
+                Paint::red(&entry.latest_installed_version()).bold(),
                 Paint::green(&entry.current_version).bold()
             );
             should_update_packages.push(entry.package_name.as_str());
