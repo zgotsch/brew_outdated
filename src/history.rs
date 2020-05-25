@@ -103,15 +103,15 @@ pub async fn fish_history() -> Option<Vec<FishLine>> {
     return Some(fish_lines);
 }
 
-fn last_100<T>(v: Vec<T>) -> Vec<T> {
+fn last_1000<T>(v: Vec<T>) -> Vec<T> {
     v.into_iter().rev().take(1000).collect::<Vec<T>>()
 }
 
 pub async fn recent_history() -> Option<Vec<HistoryLine>> {
     // Recent for histories which do not support time is the last 1000 lines
-    let bash = bash_history().map(|v| v.map(|lines: Vec<HistoryLine>| last_100(lines)));
-    let zsh = zsh_history().map(|v| v.map(|lines: Vec<HistoryLine>| last_100(lines)));
-    let nushell = nushell_history().map(|v| v.map(|lines: Vec<HistoryLine>| last_100(lines)));
+    let bash = bash_history().map(|v| v.map(|lines: Vec<HistoryLine>| last_1000(lines)));
+    let zsh = zsh_history().map(|v| v.map(|lines: Vec<HistoryLine>| last_1000(lines)));
+    let nushell = nushell_history().map(|v| v.map(|lines: Vec<HistoryLine>| last_1000(lines)));
 
     // Recent for histories which do support time is the last
     let current_time = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
