@@ -324,6 +324,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tokio",
+ "yansi",
 ]
 
 [[package]]
@@ -581,3 +582,9 @@ dependencies = [
  "winapi 0.2.8",
  "winapi-build",
 ]
+
+[[package]]
+name = "yansi"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9fc79f4a1e39857fc00c3f662cbf2651c771f00e9c15fe2abc341806bd46bd71"
