@@ -1,8 +1,11 @@
+use async_trait::async_trait;
 use futures::future::FutureExt;
 use futures::join;
 use regex::Regex;
-use serde::Deserialize;
+use rev_lines::RevLines;
 use std::env;
+use std::io;
+use std::iter::Iterator;
 use std::path::Path;
 use std::path::PathBuf;
 use std::str;
@@ -14,6 +17,30 @@ type HistoryLine = String;
 lazy_static! {
     static ref CMD_RE: Regex = Regex::new("^- cmd: (.*)$").unwrap();
     static ref TIME_RE: Regex = Regex::new(r#"^\s*when: (\d+)$"#).unwrap();
+}
+
+// TODO(zgotsch): remove pub here
+pub async fn read_lines_reversed(path: &Path) -> io::Result<impl Iterator<Item = String>> {
+    let f: io::File = fs::File::open(path)?;
+    RevLines::new(BufReader::new(f))
+}
+
+pub enum HistoryLine2 {
+    WithoutTime(String),
+    WithUnixTime(String, u64),
+}
+
+#[async_trait]
+pub trait TerminalHistoryDescription {
+    async fn latestHistoryLines() -> Box<dyn Iterator<Item = HistoryLine2>>;
+}
+
+pub struct BashHistoryDescription();
+#[async_trait]
+impl TerminalHistoryDescription for BashHistoryDescription {
+    async fn latestHistoryLines() -> Box<dyn Iterator<Item = HistoryLine2>> {
+        return Box::new(std::iter::empty());
+    }
 }
 
 pub fn bash_history_file_location() -> Option<PathBuf> {
@@ -58,9 +85,7 @@ async fn nushell_history() -> Option<Vec<HistoryLine>> {
     read_simple_history(&nushell_history_path).await
 }
 
-#[derive(Deserialize, Debug)]
 pub struct FishLine {
-    #[serde(rename = "when")]
     time: u64,
     cmd: HistoryLine,
 }
