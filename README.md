@@ -34,3 +34,14 @@ If you would like to run it each time you start a new shell, you can add it to y
 | `zsh`  | `~/.zshrc`                                                                                                                                     |
 | `fish` | `~/.config/fish/config.fish`                                                                                                                   |
 | `nu`   | can be configured under the startup config option: https://www.nushell.sh/blog/2020/04/21/nushell_0_13_0.html#startup-commands-jonathandturner |
+
+## Sample output
+
+```
+You have recently used out-of-date executables which are managed by `brew`.
+Consider updating the following:
+	fish (installed: 3.1.0, available: 3.1.2)
+	git (installed: 2.25.0_1, available: 2.26.2_1)
+	go (installed: 1.14.2_1, available: 1.14.3)
+To upgrade all of these in one command, run `brew upgrade fish git go`
+```
