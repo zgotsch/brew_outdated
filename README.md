@@ -35,7 +35,9 @@ If you would like to run it each time you start a new shell, you can add it to y
 | `fish` | `~/.config/fish/config.fish`                                                                                                                   |
 | `nu`   | can be configured under the startup config option: https://www.nushell.sh/blog/2020/04/21/nushell_0_13_0.html#startup-commands-jonathandturner |
 
-## Sample output
+## Output
+
+When `brew_outdated` detects out-of-date executables, it will advise you of the packages responsible for those executables with a message like:
 
 ```
 You have recently used out-of-date executables which are managed by `brew`.
@@ -45,3 +47,5 @@ Consider updating the following:
 	go (installed: 1.14.2_1, available: 1.14.3)
 To upgrade all of these in one command, run `brew upgrade fish git go`
 ```
+
+When `brew_outdated` does not detect any out-of-date executables, it does not produce any output.
