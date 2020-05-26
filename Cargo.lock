@@ -22,6 +22,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf1de2fe8c75bc145a2f577add951f8134889b4795d47466a54a5c846d691693"
 
 [[package]]
+name = "brew_outdated"
+version = "0.1.0"
+dependencies = [
+ "derive_more",
+ "fork",
+ "futures",
+ "lazy_static",
+ "regex",
+ "serde",
+ "serde_json",
+ "tokio",
+ "yansi",
+]
+
+[[package]]
 name = "bytes"
 version = "0.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -321,21 +336,6 @@ name = "once_cell"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b631f7e854af39a1739f401cf34a8a013dfe09eac4fa4dba91e9768bd28168d"
-
-[[package]]
-name = "outdated"
-version = "0.1.0"
-dependencies = [
- "derive_more",
- "fork",
- "futures",
- "lazy_static",
- "regex",
- "serde",
- "serde_json",
- "tokio",
- "yansi",
-]
 
 [[package]]
 name = "pin-project"
