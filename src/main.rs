@@ -1,6 +1,7 @@
 #[macro_use]
 extern crate lazy_static;
 
+use fork::{daemon, Fork};
 use futures::join;
 use futures::stream::futures_unordered::FuturesUnordered;
 use futures::stream::StreamExt;
@@ -8,8 +9,12 @@ use regex::Regex;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::ffi::OsString;
-use std::path::Path;
+use std::io;
+use std::io::prelude::*;
+use std::path::{Path, PathBuf};
+use std::process::{exit, Command, Output};
 use std::rc::Rc;
+use std::time::SystemTime;
 use yansi::Paint;
 
 mod history;
@@ -17,6 +22,8 @@ mod homebrew;
 
 lazy_static! {
     static ref EXTRACT_CMD_RE: Regex = Regex::new(r#"^\s*(\S+)"#).unwrap();
+    static ref RS_ERROR_DIR: PathBuf = PathBuf::from("/tmp/rs_outdated");
+    static ref BREW_UPDATE_ERROR_FILE_RE: Regex = Regex::new(r#"^brew_output_\d+$"#).unwrap();
 }
 
 fn extract_cmd(line: &str) -> Option<&str> {
@@ -24,8 +31,54 @@ fn extract_cmd(line: &str) -> Option<&str> {
     Path::new(first_token).file_name()?.to_str()
 }
 
+fn make_error_filename() -> PathBuf {
+    let unix_time = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap();
+    let mut path = RS_ERROR_DIR.clone();
+    path.push(format!("brew_output_{}", unix_time.as_secs()));
+    path
+}
+
+fn error_file_paths() -> io::Result<impl Iterator<Item = io::Result<PathBuf>>> {
+    Ok(std::fs::read_dir(&*RS_ERROR_DIR)?.filter_map(|r| match r {
+        Ok(dir_entry) => {
+            if BREW_UPDATE_ERROR_FILE_RE.is_match(
+                &dir_entry
+                    .path()
+                    .file_name()
+                    .unwrap_or(std::ffi::OsStr::new(""))
+                    .to_str()
+                    .unwrap(),
+            ) {
+                Some(Ok(dir_entry.path()))
+            } else {
+                None
+            }
+        }
+        Err(e) => Some(Err(e)),
+    }))
+}
+
 #[tokio::main]
 async fn main() -> Result<(), String> {
+    // If we find an error file, it means we didn't succeed at running brew update last time we ran
+    // print a message for the user
+    match error_file_paths() {
+        Ok(error_file_paths) => {
+            if let Some(latest_error_path) = error_file_paths.map(|p| p.unwrap()).max() {
+                println!("{} `{}` did not run successfully last time. Please see {} for the error output.\n\
+                          This message will stop appearing when the deferred `{}` runs successfully.\n",
+                          Paint::red("Warning:").bold(),
+                          Paint::new("brew update").bold(),
+                          Paint::new(latest_error_path.display()).bold(),
+                          Paint::new("brew update").bold(),
+                        );
+            }
+        }
+        _ => (),
+    }
+
     // get commands run recently
     // run brew outdated
     // get things that are in both and print them nicely
@@ -112,6 +165,40 @@ async fn main() -> Result<(), String> {
             "To upgrade all of these in one command, run `{}`",
             Paint::new(brew_cmd).bold()
         );
+    }
+
+    if let Ok(Fork::Child) = daemon(false, false) {
+        let error_to_write = match Command::new("brew").arg("update").output() {
+            Ok(Output { status, stderr, .. }) => {
+                if status.success() {
+                    None
+                } else {
+                    Some(String::from_utf8_lossy(&stderr).to_string())
+                }
+            }
+            Err(e) => Some(e.to_string()),
+        };
+        // If this fails, not much we can do...
+        std::fs::create_dir(&*RS_ERROR_DIR)
+            .or_else(|e| match e.kind() {
+                std::io::ErrorKind::AlreadyExists => Ok(()),
+                _ => Err(e),
+            })
+            .unwrap();
+
+        if let Some(error_string) = error_to_write {
+            let mut file = std::fs::File::create(make_error_filename()).unwrap();
+            file.write_all(error_string.as_bytes()).unwrap();
+        } else {
+            // if successful, rename error files
+            for filepath in error_file_paths().unwrap() {
+                if let Ok(filepath) = filepath {
+                    let _ = std::fs::rename(&filepath, format!("{}_resolved", filepath.display()));
+                }
+            }
+        }
+
+        exit(0);
     }
 
     Ok(())
