@@ -1,0 +1,6 @@
+# 0.1.0
+- Initial version
+
+# 0.2.0
+- Brew changed --json option to --json=v2, so move to using that option
+- Don't print error messages for brew packages that do not have binaries
