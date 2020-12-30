@@ -1,10 +1,10 @@
 use derive_more::{Display, Error};
 use regex::Regex;
 use serde::Deserialize;
-use std::ffi::OsString;
 use std::io;
 use std::path::PathBuf;
 use std::str;
+use std::{ffi::OsString, io::ErrorKind};
 use tokio::process::Command;
 use tokio::stream::StreamExt;
 
@@ -24,7 +24,7 @@ lazy_static! {
 }
 
 #[derive(Deserialize, Debug)]
-pub struct BrewOutdatedEntry {
+pub struct BrewOutdatedFormulaEntry {
     #[serde(rename = "name")]
     pub package_name: String,
     pub installed_versions: Vec<String>,
@@ -32,7 +32,7 @@ pub struct BrewOutdatedEntry {
     pub pinned: bool,
 }
 
-impl BrewOutdatedEntry {
+impl BrewOutdatedFormulaEntry {
     pub fn latest_installed_version(&self) -> &String {
         return &self.installed_versions.last().expect(
             "Tried to get the latest installed version of a package with no installed versions.",
@@ -40,38 +40,55 @@ impl BrewOutdatedEntry {
     }
 }
 
+#[derive(Deserialize, Debug)]
+pub struct BrewOutdatedOutput {
+    pub formulae: Vec<BrewOutdatedFormulaEntry>,
+}
+
 #[derive(Debug, Display, Error)]
 pub enum OutdatedError {
     UtfParseError(std::str::Utf8Error),
     BrewJsonParseError(serde_json::Error),
 }
-pub async fn outdated() -> Result<Vec<BrewOutdatedEntry>, OutdatedError> {
+pub async fn outdated() -> Result<BrewOutdatedOutput, OutdatedError> {
     let output = Command::new("brew")
         .arg("outdated")
-        .arg("--json")
+        .arg("--json=v2")
         .output()
         .await
         .expect("Failed to run `brew outdated`");
     let brew_outdated_json =
         str::from_utf8(&output.stdout).map_err(OutdatedError::UtfParseError)?;
-    let brew_entries: Vec<BrewOutdatedEntry> =
+    let brew_entries: BrewOutdatedOutput =
         serde_json::from_str(brew_outdated_json).map_err(OutdatedError::BrewJsonParseError)?;
     return Ok(brew_entries);
 }
 
 pub async fn executables(package_name: &str, installed_version: &str) -> io::Result<Vec<OsString>> {
-    let bin_path: PathBuf = [
-        &*BREW_PREFIX,
-        "Cellar",
-        package_name,
-        installed_version,
-        "bin",
-    ]
-    .iter()
-    .collect();
-    Ok(tokio::fs::read_dir(&bin_path)
-        .await?
-        .map(|r| r.unwrap().file_name())
-        .collect::<Vec<OsString>>()
-        .await)
+    let package_path: PathBuf = [&*BREW_PREFIX, "Cellar", package_name, installed_version]
+        .iter()
+        .collect();
+    let _ = tokio::fs::metadata(&package_path).await?;
+
+    let bin_path = {
+        let mut p = package_path.clone();
+        p.push("bin");
+        p
+    };
+
+    match tokio::fs::read_dir(&bin_path).await {
+        Ok(read_dir) => {
+            return Ok(read_dir
+                .map(|r| r.unwrap().file_name())
+                .collect::<Vec<OsString>>()
+                .await);
+        }
+        Err(err) => {
+            if err.kind() == ErrorKind::NotFound {
+                return Ok(vec![]);
+            } else {
+                return Err(err);
+            }
+        }
+    }
 }

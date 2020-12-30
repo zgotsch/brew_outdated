@@ -86,14 +86,16 @@ async fn main() -> Result<(), String> {
     // a guess for a reasonable upper bound of executables per brew package
     const EXECUTABLES_PER_PACKAGE: usize = 10;
     let brew_fut = async {
-        let outdated: Vec<homebrew::BrewOutdatedEntry> = homebrew::outdated().await.unwrap();
-        let outdated_executable_to_package: HashMap<OsString, Rc<homebrew::BrewOutdatedEntry>> =
-            HashMap::with_capacity(outdated.len() * EXECUTABLES_PER_PACKAGE);
+        let outdated: homebrew::BrewOutdatedOutput = homebrew::outdated().await.unwrap();
+        let outdated_executable_to_package: HashMap<
+            OsString,
+            Rc<homebrew::BrewOutdatedFormulaEntry>,
+        > = HashMap::with_capacity(outdated.formulae.len() * EXECUTABLES_PER_PACKAGE);
         let outdated_executables: HashSet<OsString> =
-            HashSet::with_capacity(outdated.len() * EXECUTABLES_PER_PACKAGE);
+            HashSet::with_capacity(outdated.formulae.len() * EXECUTABLES_PER_PACKAGE);
 
         let executables_futures = FuturesUnordered::new();
-        for outdated_entry in outdated.into_iter() {
+        for outdated_entry in outdated.formulae.into_iter() {
             executables_futures.push(async {
                 let executables = homebrew::executables(
                     &outdated_entry.package_name,
